@@ -1,7 +1,15 @@
-const CHARACTERS = 'Zarnof'; // A comma seperated list of characters who use Wild Magic (Multiple characters: 'John,Jake,Aron').
+/*
+MagicalSurges
+Version 0.0.2
+Github https://github.com/nmrcarroll/roll20-api-scripts/tree/master/MagicalSurges
+*/
 
-//Custom magical surges
-var Surges = {
+//Modify the constants below to fit your game
+
+// A comma seperated list of characters who use Wild Magic (Multiple characters: 'John,Jake,Aron').
+const CHARACTERS = 'Zarnof';
+//Custom magical surges in dictionary format
+const Surges = {
     "0001": "Roll twice on this table, ignoring this result. ",
     "0002": "You lose 2d8 Hit Points. Choose a creature within 60 feet to gain the same amount you lost. ",
     "0003": "You cast magic missile as a 2d4th level spell, spreading the missiles equally over all enemies within range. ",
@@ -86,6 +94,8 @@ var Surges = {
 
 };
 
+//Don't change below this line unless you know what you're doing.
+
 //Makes sure that the number generated matches how surges are stored by adding zeros.
 function zeroFill( number, width )
 {
@@ -99,7 +109,7 @@ function zeroFill( number, width )
 
 //Formats the output of a surge to a format roll20 can accept.
 function makeSurge() {
-	var roll = randomInteger(81);
+	var roll = randomInteger(Object.keys(Surges).length);
 	var affect =  Surges[zeroFill(roll, 4)];
 	var chatMesg = "";
     chatMesg = '&{template:atk} {{rname=WildRoll}} {{rnamec=rnamec}} {{r1='+ roll + '}} {{normal=1}} {{desc=' + affect + '}}';
@@ -119,23 +129,22 @@ on("chat:message", function(msg) {
 
   //Automatically detect when a spell is rolled from the coresponding characters.
   if(msg && msg.rolltemplate && (msg.rolltemplate === 'spell' || msg.rolltemplate === 'atk' || msg.rolltemplate === 'dmg' || msg.rolltemplate === 'atkdmg')){
-        const CHARACTERS = 'Zarnof'; // A comma seperated list of characters who use Wild Magic (Multiple characters: 'John,Jake,Aron').
         let character_name = msg.content.match(/charname=([^\n{}]*[^"\n{}])/);
-        let spell_level = msg.content.match(/spelllevel=([^\n{}]*[^"\n{}])/);
         character_name = RegExp.$1;
-        //Make sure we're not pulling from the first regex
-        if(spell_level != null){
-            spell_level = RegExp.$1;
-        }
-
         let allowed_characters = CHARACTERS.split(',');
-        let whisper = msg.target
-
         //Check if the caster is on the allowed list of characters.
         if(allowed_characters.includes(character_name)){
+            let spell_level = msg.content.match(/spelllevel=([^\n{}]*[^"\n{}])/);
+            //Make sure we're not pulling from the first regex
+            if(spell_level != null){
+                spell_level = RegExp.$1;
+            }
+            let cantrip = msg.content.includes("cantrip}}")
+            let whisper = msg.target;
             //If a spell was rolled, automatically roll a d20 to see if a surge happens
-            var roll = randomInteger(20)
-            if((spell_level > 0)  || (msg.rolltemplate === 'spell' && spell_level != null) ){
+            var roll = randomInteger(20);
+            //Check if the roll is actually a spell and not a cantrip or other attack
+            if(!cantrip && (spell_level > 0 || msg.rolltemplate == 'spell') ){
                 var chatMesg = "";
                 chatMesg = '&{template:simple} {{rname=Wild}} {{r1='+ roll + '}} {{normal=1}}';
             if(whisper==undefined){
@@ -143,14 +152,17 @@ on("chat:message", function(msg) {
             }
             else{
                 sendChat(msg.who,"/w gm " + chatMesg);
+                sendChat(msg.who,"/w " + msg.who + " " + chatMesg);
             }
             //If a 1 was rolled for the surge output a surge automatically.
             if(roll == 1){
+                let mSurge = makeSurge();
                 if(whisper==undefined){
-                    sendChat(msg.who, makeSurge());
+                    sendChat(msg.who, mSurge);
                 }
                 else{
-                    sendChat(msg.who,"/w gm " + makeSurge());
+                    sendChat(msg.who,"/w gm " + mSurge);
+                    sendChat(msg.who,"/w " + msg.who + " " + mSurge);
                 }
             }
          }
